@@ -1,4 +1,4 @@
-# Toolbar Fade
+# Floating Toolbar Fade
 
 [中文说明](./README.md)
 
@@ -36,7 +36,7 @@ Opacity by distance:
 
 **From the bazaar (recommended)**
 
-`Settings → Bazaar → Download`, search for "Toolbar Fade", install and enable it.
+`Settings → Bazaar → Download`, search for "Floating Toolbar Fade", install and enable it.
 
 **Manually**
 
@@ -62,7 +62,7 @@ Alternatively, download `package.zip` from the latest Release and extract it int
 
 ## Settings
 
-`Settings → Bazaar → Downloaded → Toolbar Fade → Settings` (no top-bar icon is used).
+`Settings → Bazaar → Downloaded → Floating Toolbar Fade → Settings` (no top-bar icon is used).
 
 | Option | Default | Meaning |
 | --- | --- | --- |

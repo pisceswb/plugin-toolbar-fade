@@ -1,54 +1,95 @@
 """生成插件图标 icon.png（160x160）。
 
-画面：一条工具条，从左到右逐渐变淡消失 —— 对应插件的功能本身。
-不依赖外部素材，只用 Pillow 画出来，便于以后重新生成。
+设计：**浮动工具栏**（主题蓝圆角条 + 排成一排的按钮圆点，越靠右越淡）
+      + **鼠标指针**（位于右下方，表示鼠标正在移开 → 工具栏随之淡出）
+      + 柔和投影（体现"浮动"）+ 浅蓝渐变背景（深浅主题下都看得清）
+
+不依赖外部素材，可随时重新生成：python tools/make-icon.py
 """
 from PIL import Image, ImageDraw, ImageFilter
 
-SIZE = 160
-SCALE = 4                      # 先放大 4 倍画，再缩小，边缘更干净
-W, H = SIZE * SCALE, SIZE * SCALE
+S, K = 160, 4
+BG_TOP = (204, 220, 250)
+BG_BOTTOM = (176, 196, 244)
+PILL = (74, 108, 247)          # 思源主题蓝
+PILL_EDGE = (58, 88, 219)
+DOT = (255, 255, 255)
+SHADOW = (52, 76, 150)
+CURSOR_FILL = (255, 255, 255)
+CURSOR_EDGE = (46, 54, 74)
 
-BG_TOP = (74, 108, 247)        # 思源主题蓝（渐变起点）
-BG_BOTTOM = (124, 92, 232)     # 渐变终点
-BAR = (255, 255, 255)
 
-img = Image.new("RGB", (W, H), BG_TOP)
+def gradient(top, bottom):
+    img = Image.new("RGB", (S * K, S * K), top)
+    g = Image.new("L", (1, S * K))
+    for y in range(S * K):
+        g.putpixel((0, y), int(255 * y / (S * K)))
+    return Image.composite(Image.new("RGB", (S * K, S * K), bottom), img,
+                           g.resize((S * K, S * K))).convert("RGBA")
 
-# 背景做一点竖向渐变，避免看起来太扁平
-gradient = Image.new("L", (1, H))
-for y in range(H):
-    gradient.putpixel((0, y), int(255 * y / H))
-img = Image.composite(Image.new("RGB", (W, H), BG_BOTTOM), img, gradient.resize((W, H)))
 
-# 工具条：四段白色圆角矩形，透明度依次降低，形成「逐渐变淡」的意象
-# 段之间留足空隙，避免外发光把它们糊成一团
-bar_h = int(H * 0.26)
-bar_y = int(H * 0.37)
-gap = int(W * 0.03)
-segments = []
-left = int(W * 0.12)
-for width_ratio, alpha in [(0.21, 1.00), (0.19, 0.68), (0.17, 0.42), (0.15, 0.22)]:
-    width = int(W * width_ratio)
-    segments.append((left, left + width, alpha))
-    left += width + gap
+def rounded(size, radius, fill, outline=None, width=1):
+    layer = Image.new("RGBA", size, (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    draw.rounded_rectangle([0, 0, size[0] - 1, size[1] - 1], radius=radius, fill=fill)
+    if outline:
+        draw.rounded_rectangle([0, 0, size[0] - 1, size[1] - 1], radius=radius, outline=outline, width=width)
+    return layer
 
-layer = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-draw = ImageDraw.Draw(layer)
-radius = int(bar_h * 0.38)
-for left, right, alpha in segments:
-    draw.rounded_rectangle(
-        [left, bar_y, right, bar_y + bar_h],
-        radius=radius,
-        fill=(*BAR, int(255 * alpha)),
-    )
 
-# 轻微外发光（强度压到 45%），让工具条在背景上更醒目但不糊
-glow = layer.filter(ImageFilter.GaussianBlur(radius=bar_h // 3))
-glow.putalpha(glow.getchannel("A").point(lambda value: int(value * 0.45)))
-img = Image.alpha_composite(img.convert("RGBA"), glow)
-img = Image.alpha_composite(img, layer)
+img = gradient(BG_TOP, BG_BOTTOM)
 
-img = img.convert("RGB").resize((SIZE, SIZE), Image.LANCZOS)
-img.save("icon.png", "PNG", optimize=True)
-print(f"icon.png written: {img.size[0]}x{img.size[1]}")
+# ── 浮动工具栏 ────────────────────────────────────────────────
+# 整体略偏左上，给右下角的鼠标指针留出位置（指针不能被画布裁掉）
+pw, ph, radius = int(112 * K), int(40 * K), int(14 * K)
+px, py = (S * K - pw) // 2 - int(10 * K), int(50 * K)
+
+# 投影：让它看起来是「浮」在内容之上
+shadow = Image.new("RGBA", (pw + 44 * K, ph + 44 * K), (0, 0, 0, 0))
+ImageDraw.Draw(shadow).rounded_rectangle(
+    [22 * K, 22 * K, 22 * K + pw, 22 * K + ph], radius=radius, fill=(*SHADOW, 170))
+img.alpha_composite(shadow.filter(ImageFilter.GaussianBlur(9 * K)), (px - 22 * K, py - 14 * K))
+
+img.alpha_composite(rounded((pw, ph), radius, (*PILL, 255), outline=(*PILL_EDGE, 255), width=int(1.4 * K)), (px, py))
+
+# 按钮圆点：从左到右逐渐变淡（这就是「淡出」）。数量控制在 4 个，
+# 太少不像工具栏，太多在小尺寸（集市列表约 40px）下会糊成一团。
+dot = int(17 * K)
+count = 4
+inner = pw - 2 * int(15 * K)
+gap = int(inner / count)
+for i in range(count):
+    alpha = int(255 * (1 - i / (count + 0.2)))
+    cx = px + int(15 * K) + i * gap + (gap - dot) // 2
+    cy = py + (ph - dot) // 2
+    layer = Image.new("RGBA", (dot, dot), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).ellipse([0, 0, dot - 1, dot - 1], fill=(*DOT, alpha))
+    img.alpha_composite(layer, (cx, cy))
+
+# ── 鼠标指针（右下方，表示鼠标正在移开）────────────────────────
+cursor_shape = [(0, 0), (0, 27), (7, 20), (12, 31), (18, 28), (13, 17), (22, 16)]
+cx0 = px + pw - int(18 * K)
+cy0 = py + ph + int(5 * K)
+cursor_layer = Image.new("RGBA", (30 * K, 38 * K), (0, 0, 0, 0))
+cursor_pts = [(a * K, b * K) for a, b in cursor_shape]
+ImageDraw.Draw(cursor_layer).polygon(cursor_pts, fill=(*CURSOR_FILL, 255))
+ImageDraw.Draw(cursor_layer).line(cursor_pts + [cursor_pts[0]],
+                                  fill=(*CURSOR_EDGE, 255), width=int(1.3 * K), joint="curve")
+img.alpha_composite(cursor_layer, (cx0, cy0))
+
+final = img.convert("RGB").resize((S, S), Image.LANCZOS)
+final.save("icon.png", "PNG", optimize=True)
+print(f"icon.png written: {final.size[0]}x{final.size[1]}")
+
+# 小尺寸 + 深色底色的辨析度检查
+small = [final.resize((n, n), Image.LANCZOS) for n in (40, 56, 72)]
+sheet = Image.new("RGB", (40 + 56 + 72 + 140, 120), (250, 250, 252))
+x = 20
+for s in small:
+    sheet.paste(s, (x, 24))
+    x += s.size[0] + 10
+dark = Image.new("RGB", (120, 120), (32, 36, 46))
+dark.paste(final.resize((72, 72), Image.LANCZOS), (24, 24))
+sheet.paste(dark, (x, 0))
+sheet.save("_icon_preview.png", "PNG", optimize=True)
+print("_icon_preview.png written（40/56/72px 与深色底对比）")

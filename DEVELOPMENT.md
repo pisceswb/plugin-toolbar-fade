@@ -81,9 +81,9 @@ if (!(ct.prototype instanceof Plugin))  → 报 "does not extends Plugin"
 
 ## 其他踩过的坑（都已在源码注释里说明）
 
-- **不要给 `.protyle-toolbar` 加 `pointer-events: none`**：它是工具条按钮的父元素，
+- **不要给 `.protyle-toolbar` 加 `pointer-events: none`**：它是浮动工具栏上的按钮的父元素，
   加了之后整条工具条都点不动，光标会变成编辑框的 I 型、点击直接穿透到正文。
-- **关闭工具条前要清掉内联 `display`**：思源核心在「选区滚出视野」时会写
+- **关闭浮动工具栏前要清掉内联 `display`**：思源核心在「选区滚出视野」时会写
   `toolbar.element.style.display = "none"`；插件关闭时也要照做（核心的 `hideElements` 同样如此），
   否则鼠标回来时工具条再也显示不出来。
 - **武装状态要每帧重新评估**：只在工具条「弹出那一刻」判断的话，

@@ -1,6 +1,6 @@
 # 发布到思源集市（发布指南）
 
-本文说明如何把「工具条淡出」发布到思源笔记的社区集市（bazaar）。
+本文说明如何把「浮动工具栏淡出」发布到思源笔记的社区集市（bazaar）。
 规则依据 [siyuan-note/bazaar](https://github.com/siyuan-note/bazaar) 的
 `README.zh-CN.md` 与 `rules/*.go`（自动检查用的实际判定代码）。
 
@@ -29,7 +29,7 @@
 | `plugin.json` 的 `author` / `url` | `pisceswb` / `https://github.com/pisceswb/plugin-toolbar-fade` |
 | `plugin.json` 的 `readme` | `{ "default": "README.md", "en": "README.en.md" }`（集市**必填**，且文件必须在包里） |
 | `plugin.json` 的 `icon` / `preview` | `icon.png`（7.8 KiB，上限 64 KiB）、`preview.png`（128 KiB，上限 512 KiB） |
-| `plugin.json` 的 `version` | `0.2.1`，合法 semver，**不带 `v` 前缀** |
+| `plugin.json` 的 `version` | `0.3.0`，合法 semver，**不带 `v` 前缀** |
 | `LICENSE` | 仓库根已有 MIT 全文（集市 PR Check 要求） |
 | `README.md` / `README.en.md` | 中英文说明，都在包里 |
 | i18n 文件名 | `i18n/zh-CN.json`、`i18n/en.json`（思源读的就是这个名字，别写成 `zh_CN`） |
@@ -102,7 +102,7 @@ README.en.md
 cd plugin-toolbar-fade
 git init
 git add .
-git commit -m "Initial commit: Toolbar Fade (plugin-toolbar-fade) v0.2.1"
+git commit -m "Initial commit: Floating Toolbar Fade (plugin-toolbar-fade) v0.3.0"
 git branch -M main
 git remote add origin https://github.com/pisceswb/plugin-toolbar-fade.git
 git push -u origin main
@@ -119,9 +119,9 @@ git push -u origin main
 
 在 GitHub 仓库页面 → **Releases** → **Draft a new release**：
 
-- **Choose a tag**：填 `0.2.1`，点「Create new tag on publish」
-  - Tag **必须等于** `plugin.json` 里的 `version`，且**不要写 `v0.2.1`**
-- **Release title**：`0.2.1`（随意，一般同 Tag）
+- **Choose a tag**：填 `0.3.0`，点「Create new tag on publish」
+  - Tag **必须等于** `plugin.json` 里的 `version`，且**不要写 `v0.3.0`**
+- **Release title**：`0.3.0`（随意，一般同 Tag）
 - **Attach binaries**：把 `package.zip` 拖进去
 - 点 **Publish release**
 
@@ -171,7 +171,7 @@ git push -u origin main
 
 **不需要再提 PR**。只要：
 
-1. 把 `plugin.json` 的 `version` 提高（例如 `0.2.1` → `0.2.2`）
+1. 把 `plugin.json` 的 `version` 提高（例如 `0.3.0` → `0.3.1`）
 2. `npm run release`（或依次跑 build / test / pack / preflight）
 3. 发布一个**新的 Latest Release**，Tag 用新版本号，附件上传新的 `package.zip`
 

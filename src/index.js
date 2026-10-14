@@ -70,7 +70,7 @@ const LIMITS = {
 /** 加在工具条上的类名（样式见同目录 index.css） */
 const FADE_CLASS = "sy-toolbar-fade";
 /** 版本号，仅用于日志排查 */
-const VERSION = "0.2.9";
+const VERSION = "0.3.0";
 /** 工具条矩形向外扩张的距离（像素）：工具条是主要操作对象，扩得多一点 */
 const PAD_TOOLBAR = 10;
 /** 选区矩形向外扩张的距离（像素） */
