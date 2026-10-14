@@ -1,0 +1,12 @@
+{
+  "toolbarFade": "Toolbar Fade",
+  "enabled": "Enable distance fade",
+  "enabledTip": "When off, the toolbar keeps SiYuan's native behaviour (stays until the next click)",
+  "nearDistance": "Fade starts beyond (px)",
+  "nearDistanceTip": "The toolbar stays fully opaque within this distance; the farther away, the fainter it gets",
+  "farDistance": "Close immediately beyond (px)",
+  "farDistanceTip": "The toolbar is closed immediately past this distance (no delay, no re-showing). At exactly this distance it is still visible, only faint",
+  "saved": "Saved",
+  "resetDefaults": "Reset to defaults",
+  "restartHint": "Fully opaque within 80 → fainter with distance → closed immediately past 200. Changes apply instantly, no restart needed"
+}

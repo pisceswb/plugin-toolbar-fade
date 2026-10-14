@@ -1,0 +1,36 @@
+{
+  "name": "plugin-toolbar-fade",
+  "author": "pisceswb",
+  "url": "https://github.com/pisceswb/plugin-toolbar-fade",
+  "version": "0.2.1",
+  "minAppVersion": "3.0.0",
+  "backends": [
+    "all"
+  ],
+  "frontends": [
+    "all"
+  ],
+  "displayName": {
+    "default": "Toolbar Fade",
+    "zh-CN": "工具条淡出"
+  },
+  "description": {
+    "default": "The text-selection toolbar fades out as the mouse moves away and closes immediately beyond a set distance, like Word's floating toolbar.",
+    "zh-CN": "选中文字后的浮动工具条随鼠标远离逐渐变淡，超过设定距离立即关闭；鼠标移回即刻恢复，类似 Word 的浮动工具栏。"
+  },
+  "readme": {
+    "default": "README.md",
+    "en": "README.en.md"
+  },
+  "icon": "icon.png",
+  "preview": "preview.png",
+  "keywords": [
+    "工具条",
+    "工具栏",
+    "淡出",
+    "鼠标",
+    "toolbar",
+    "fade",
+    "selection"
+  ]
+}

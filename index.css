@@ -1,0 +1,23 @@
+/*!
+ * 工具条淡出 (Toolbar Fade) - 思源笔记插件
+ *
+ * 这个文件是「可读版」的样式说明。插件运行时会把同样的规则内联注入到页面里
+ * （见 src/index.js 的 STYLE_TEXT），这样不依赖外部资源的加载时序，卸载时也能干净移除。
+ * 如要调整，请同时改 src/index.js 里的 STYLE_TEXT，然后重新打包入口（build.mjs）。
+ *
+ * 为什么需要这些规则：
+ *   思源的工具条就是普通 DOM（div.protyle-toolbar），显示/隐藏只靠切换类名 fn__none，
+ *   而 fn__none 的定义是 display:none !important，没有过渡效果。
+ *   因此本插件改用内联 opacity 做「逐渐变淡」，CSS 只负责让过渡平滑。
+ *
+ * 注意：这里**不能**写 pointer-events: none。
+ *   .protyle-toolbar 是按钮的父元素，一旦禁用指针事件，整条工具条的按钮就全部失效
+ *   （光标变成编辑框的 I 型、点击穿透到正文）。淡化过程中鼠标就在附近，必须保持可点击。
+ */
+
+.protyle-toolbar.sy-toolbar-fade {
+    /* 只过渡透明度，避免干扰思源自己写的 left / top 定位 */
+    transition-property: opacity;
+    transition-duration: 0.18s;
+    transition-timing-function: ease-out;
+}

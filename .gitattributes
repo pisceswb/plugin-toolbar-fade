@@ -1,0 +1,14 @@
+# 统一换行符，避免 clone / checkout 时出现 CRLF 警告与跨平台差异
+* text=auto eol=lf
+
+# 图片与压缩包是二进制，不要做换行符转换
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.webp binary
+*.avif binary
+*.zip binary
+
+# 这些文件保留各自的换行习惯
+*.ps1 text eol=crlf
+*.bat text eol=crlf
