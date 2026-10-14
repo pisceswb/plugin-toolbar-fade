@@ -12,12 +12,12 @@ using it, and steps aside once you've moved on.
 
 ## Behaviour
 
-With the defaults (80px / 200px):
+With the defaults (20px / 200px):
 
 ```
 Select text              → the toolbar appears, fully opaque (the mouse is right there)
-Mouse within 80px        → still fully opaque
-Mouse beyond 80px        → fades linearly with distance
+Mouse within 20px        → still fully opaque
+Mouse beyond 20px        → fades linearly with distance
 At 200px away            → still visible, but clearly faint (opacity ≈ 0.4)
 Beyond 200px             → closed immediately, no delay, no lingering animation
 Mouse comes back         → fully opaque again, buttons clickable as usual
@@ -26,7 +26,7 @@ After it closed          → moving the mouse does not bring it back (select tex
 
 Opacity by distance:
 
-| Distance | 80px | 110px | 140px | 170px | 200px | >200px |
+| Distance | 20px | 65px | 110px | 155px | 200px | >200px |
 | --- | --- | --- | --- | --- | --- | --- |
 | Toolbar opacity | 1 | 0.85 | 0.70 | 0.55 | 0.40 | closed |
 
@@ -67,7 +67,7 @@ Alternatively, download `package.zip` from the latest Release and extract it int
 | Option | Default | Meaning |
 | --- | --- | --- |
 | Enable distance fade | on | Master switch; when off, SiYuan's native behaviour is restored |
-| Fade starts beyond | 80 px | Fully opaque within this distance, fainter the farther away |
+| Fade starts beyond | 20 px | Fully opaque within this distance, fainter the farther away |
 | Close immediately beyond | 200 px | The toolbar is closed as soon as the mouse goes past this |
 
 Only those two distances are configurable. "Delay before fading" and "fade duration" are deliberately

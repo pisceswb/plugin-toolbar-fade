@@ -454,7 +454,7 @@ check("插件接管了页面里已存在的工具条", () => {
 
 check("读取默认设置（已去掉「停留时间」与「动画时长」两项）", () => {
     assert.equal(plugin.settings.enabled, true);
-    assert.equal(plugin.settings.nearDistance, 80);
+    assert.equal(plugin.settings.nearDistance, 20);
     assert.equal(plugin.settings.farDistance, 200);
     assert.ok(!("delay" in plugin.settings), "不应再有 delay 设置");
     assert.ok(!("fadeDuration" in plugin.settings), "不应再有 fadeDuration 设置");

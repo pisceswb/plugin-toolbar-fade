@@ -1,6 +1,6 @@
 {
   "name": "plugin-toolbar-fade",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "private": true,
   "description": "思源笔记插件：选中文字后的浮动工具条随鼠标远离逐渐变淡，超过设定距离立即关闭",
   "license": "MIT",

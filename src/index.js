@@ -55,8 +55,8 @@ const STORAGE_NAME = "settings";
 
 const DEFAULTS = {
     enabled: true,
-    /** 这个距离以内完全清晰（像素） */
-    nearDistance: 80,
+    /** 这个距离以内完全清晰（像素）；超出后越远越淡 */
+    nearDistance: 20,
     /** 超过这个距离立即关闭工具条（像素） */
     farDistance: 200
 };
@@ -70,7 +70,7 @@ const LIMITS = {
 /** 加在工具条上的类名（样式见同目录 index.css） */
 const FADE_CLASS = "sy-toolbar-fade";
 /** 版本号，仅用于日志排查 */
-const VERSION = "0.2.2";
+const VERSION = "0.2.3";
 /** 工具条矩形向外扩张的距离（像素）：工具条是主要操作对象，扩得多一点 */
 const PAD_TOOLBAR = 10;
 /** 选区矩形向外扩张的距离（像素） */

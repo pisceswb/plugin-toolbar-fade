@@ -8,5 +8,5 @@
   "farDistanceTip": "The toolbar is closed immediately past this distance (no delay, no re-showing). At exactly this distance it is still visible, only faint",
   "saved": "Saved",
   "resetDefaults": "Reset to defaults",
-  "restartHint": "Fully opaque within 80 → fainter with distance → closed immediately past 200. Changes apply instantly, no restart needed"
+  "restartHint": "Fully opaque within 20 → fainter with distance → closed immediately past 200. Changes apply instantly, no restart needed"
 }
