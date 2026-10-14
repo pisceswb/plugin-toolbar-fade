@@ -294,6 +294,26 @@ if (zip.has("index.js")) {
     if (!/module\.exports\s*=/.test(indexJs)) {
         fail("index.js 里没有 module.exports，思源会报 has no export");
     }
+
+    // 同一层级的重复成员定义：后者会静默覆盖前者，只在运行时才暴露。
+    // （真踩过：类里 define 了两次 readAndValidateSettings，行为一直是旧那份。）
+    const memberPattern = /^(\s{2,8})(?:async\s+)?([A-Za-z_$][\w$]*)\s*\([^)]*\)\s*\{/gm;
+    const seen = new Map();
+    let match;
+    while ((match = memberPattern.exec(indexJs)) !== null) {
+        const [full, indent, name] = match;
+        if (["if", "for", "while", "switch", "catch", "function"].includes(name)) {
+            continue;
+        }
+        const key = `${indent.length}:${name}`;
+        if (seen.has(key)) {
+            fail(`index.js 里同一层级重复定义了成员「${name}」（第 ${seen.get(key)} 行与第 ${indexJs.slice(0, match.index).split("\n").length} 行）。`
+                + "后者会静默覆盖前者，请删除多余的那份。");
+        } else {
+            seen.set(key, indexJs.slice(0, match.index).split("\n").length);
+        }
+        void full;
+    }
 }
 
 /* ────────────────────────── 仓库根（不在 zip 里，但集市会查） ────────────────────────── */

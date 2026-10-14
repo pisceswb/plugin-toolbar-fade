@@ -12,6 +12,7 @@
  */
 
 import {strict as assert} from "node:assert";
+import {readFileSync} from "node:fs";
 import {dirname, join} from "node:path";
 import {fileURLToPath} from "node:url";
 import {loadPluginModule} from "./load-built.mjs";
@@ -407,15 +408,24 @@ plugin.eventBus = {on() {}, off() {}};
 siyuanStub.Setting.prototype.plugin = plugin;
 
 const results = [];
-function check(title, fn) {
+/** 用例可以是同步或异步函数；异步的会被等待，断言抛错照常计入失败 */
+async function check(title, fn) {
     try {
-        fn();
+        await fn();
         results.push(`  ✓ ${title}`);
     } catch (error) {
         results.push(`  ✗ ${title}\n      ${error.message}`);
         process.exitCode = 1;
     }
 }
+
+/** 不产生用例的中间步骤（放鼠标、推进帧等），但断言失败也要计入 */
+async function step(title, fn) {
+    await check(title, fn);
+}
+
+/** 等一段时间，让 saveSettings() 这类异步落盘完成 */
+const flush = () => new Promise((resolve) => setTimeout(resolve, 20));
 
 function moveMouse(x, y) {
     documentStub.dispatch("mousemove", {clientX: x, clientY: y});
@@ -440,6 +450,7 @@ async function waitFor(predicate, timeoutMs = 3000) {
     return predicate();
 }
 
+
 /*────────────────────────── 测试 ──────────────────────────*/
 
 console.log("工具条淡出插件 —— 逻辑测试\n");
@@ -451,11 +462,11 @@ console.log(`已接管工具条: ${plugin.faders.size} 个；注入样式: ${sty
 const nearDistance = plugin.settings.nearDistance;
 const farDistance = plugin.settings.farDistance;
 
-check("插件接管了页面里已存在的工具条", () => {
+await check("插件接管了页面里已存在的工具条", () => {
     assert.equal(plugin.faders.size, 1);
 });
 
-check("读取默认设置（已去掉「停留时间」与「动画时长」两项）", () => {
+await check("读取默认设置（已去掉「停留时间」与「动画时长」两项）", () => {
     assert.equal(plugin.settings.enabled, true);
     assert.equal(plugin.settings.nearDistance, 20);
     assert.equal(plugin.settings.farDistance, 200);
@@ -463,7 +474,7 @@ check("读取默认设置（已去掉「停留时间」与「动画时长」两�
     assert.ok(!("fadeDuration" in plugin.settings), "不应再有 fadeDuration 设置");
 });
 
-check("设置面板已创建（思源的「插件菜单 → 设置」入口依赖这个实例）", () => {
+await check("设置面板已创建（思源的「插件菜单 → 设置」入口依赖这个实例）", () => {
     assert.ok(plugin.setting, "this.setting 必须存在，否则思源不会显示设置入口");
     assert.ok(plugin.setting instanceof siyuanStub.Setting, "应是 Setting 实例");
     // 开关 + 2 个距离项 + 恢复默认 + 说明文字
@@ -472,7 +483,7 @@ check("设置面板已创建（思源的「插件菜单 → 设置」入口依�
     assert.ok(!titles.includes("delay") && !titles.includes("fadeDuration"), "面板里不应再有这两项");
 });
 
-check("openSetting() 能正常打开面板", () => {
+await check("openSetting() 能正常打开面板", () => {
     plugin.openSetting();
     assert.equal(plugin.setting.opened, true, "设置对话框应被打开");
     assert.equal(plugin.settingOpened, true, "应走到基类的 openSetting");
@@ -484,7 +495,7 @@ function findNumberInput(key) {
     return item.createActionElement();
 }
 
-check("点「恢复默认」是就地刷新两个文本框，不会弹出新面板", () => {
+await check("点「恢复默认」是就地刷新两个文本框，不会弹出新面板", () => {
     // 先改掉设置，并让面板里的文本框处于「已被改动」的状态
     plugin.settings.nearDistance = 111;
     plugin.settings.farDistance = 999;
@@ -511,16 +522,175 @@ check("点「恢复默认」是就地刷新两个文本框，不会弹出新面�
 plugin.settings.nearDistance = nearDistance;
 plugin.settings.farDistance = farDistance;
 
+await check("回归：思源的 Setting 没有 element，刷新输入框不能依赖它", () => {
+    assert.ok(!("element" in plugin.setting),
+        "桩件与思源真实结构一样不含 element；插件必须靠自己登记的输入框来刷新");
+    // 用户手改数值后，输入框里应保持用户输入的内容（不再边输入边改写）
+    plugin.settings.nearDistance = 190;
+    plugin.settings.farDistance = 150;
+    const nearInput = findNumberInput("nearDistance");
+    const farInput = findNumberInput("farDistance");
+    nearInput.value = "190";
+    farInput.value = "150";
+
+    assert.equal(nearInput.value, "190", "输入过程中不应被自动改写（那会造成闪烁）");
+    assert.equal(farInput.value, "150");
+});
+
+await check("场景：恢复默认后输入框立刻显示 20/200（不出现中间值）", () => {
+    // 关键回归：以前数字框绑了 change，点重置时先触发 change → 先写回旧值再写默认值，
+    // 界面上会看到「先变成其它数字再跳回 20/200」。现在输入框不再有 change 监听。
+    const nearInput = findNumberInput("nearDistance");
+    const farInput = findNumberInput("farDistance");
+    assert.equal(nearInput._listeners.change, undefined, "数字框不应再绑 change 监听");
+    assert.equal(farInput._listeners.change, undefined);
+
+    nearInput.value = "40";
+    farInput.value = "300";
+    plugin.setting.items.find((item) => item.title === "resetDefaults").createActionElement()._listeners.click();
+
+    assert.equal(nearInput.value, "20", `恢复默认后应立刻是 20，实际 ${nearInput.value}`);
+    assert.equal(farInput.value, "200", `恢复默认后应立刻是 200，实际 ${farInput.value}`);
+});
+
+await check("场景：恢复默认后再手改为 30，保存的值应是 30", async () => {
+    // 恢复默认
+    plugin.setting.items.find((item) => item.title === "resetDefaults").createActionElement()._listeners.click();
+    assert.equal(plugin.settings.nearDistance, 20, "恢复默认后设置值应为 20");
+
+    // 用户把它改成 30
+    const input = findNumberInput("nearDistance");
+    assert.equal(input.value, "20", "恢复默认后输入框应显示 20");
+    input.value = "30";
+
+    // 点保存：保存时才从输入框取值，所以 30 应当被存下来，而不是被 defaults 覆盖成 20
+    const savedBefore = savedPayloads.length;
+    plugin.setting.options.confirmCallback();
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    assert.ok(savedPayloads.length > savedBefore, "应落盘");
+    assert.equal(savedPayloads.at(-1).nearDistance, 30, "保存的应是 30");
+    assert.equal(plugin.settings.nearDistance, 30, "内存里的设置也应是 30");
+});
+
+await check("场景：距离填反时拒绝保存，提示错误并让面板保持打开", async () => {
+    const nearInput = findNumberInput("nearDistance");
+    const farInput = findNumberInput("farDistance");
+    nearInput.value = "400";
+    farInput.value = "150";
+
+    const savedBefore = savedPayloads.length;
+    const messagesBefore = siyuanStub.messages.length;
+    const openedBefore = plugin.setting.openCount;
+    plugin.setting.options.confirmCallback();
+
+    const errors = siyuanStub.messages.slice(messagesBefore).filter((item) => item.type === "error");
+    assert.ok(errors.length > 0, "应弹出 error 提示");
+    assert.equal(savedPayloads.length, savedBefore, "校验不通过时不应落盘");
+
+    // 模拟用户点保存后思源强制关闭对话框：插件应把面板重新打开，并保留用户输入
+    plugin.setting.dialog.destroy();
+    assert.equal(plugin.setting.openCount, openedBefore + 1, "校验失败后应重新打开面板（保持可编辑）");
+    assert.equal(nearInput.value, "400", "用户填的数字不应被插件改掉");
+    assert.equal(farInput.value, "150");
+});
+
+await check("场景：改成合法距离后保存成功", async () => {
+    const nearInput = findNumberInput("nearDistance");
+    const farInput = findNumberInput("farDistance");
+    nearInput.value = "30";
+    farInput.value = "200";
+
+    const savedBefore = savedPayloads.length;
+    plugin.setting.options.confirmCallback();
+    await flush();
+
+    assert.ok(savedPayloads.length > savedBefore, "合法时应落盘");
+    assert.equal(savedPayloads.at(-1).nearDistance, 30);
+    assert.equal(savedPayloads.at(-1).farDistance, 200);
+    assert.equal(plugin.settings.nearDistance, 30);
+});
+
+await check("场景：错误提示里的占位符会被替换成实际距离值（用真实 i18n 文案）", () => {
+    // 走真实的 i18n 文案（测试主体用的 i18n 是「返回键名」的桩件，里面没有占位符）
+    const realI18n = JSON.parse(readFileSync(join(pluginDir, "i18n", "zh-CN.json"), "utf8"));
+    const captured = [];
+    const originalI18n = plugin.i18n;
+    const originalShowError = plugin.showError;
+    plugin.i18n = realI18n;
+    plugin.showError = (message) => captured.push(message);
+    try {
+        plugin.settings.nearDistance = 400;
+        plugin.settings.farDistance = 150;
+        assert.equal(plugin.validateSettings(), false, "填反应判为不合法");
+    } finally {
+        plugin.i18n = originalI18n;
+        plugin.showError = originalShowError;
+    }
+
+    assert.equal(captured.length, 1, "应产生一条错误文案");
+    const text = captured[0];
+    assert.ok(!text.includes("${"), `提示里不应残留占位符，实际：${text}`);
+    assert.ok(text.includes("400") && text.includes("150"), `应填入实际距离值，实际：${text}`);
+    assert.ok(text.includes("开始变淡的距离") && text.includes("立即关闭的距离"),
+        `应使用真实中文文案，实际：${text}`);
+});
+
+await check("场景：填超过 400 / 1200 时拒绝保存，并提示允许范围（不再静默夹取）", async () => {
+    const realI18n = JSON.parse(readFileSync(join(pluginDir, "i18n", "zh-CN.json"), "utf8"));
+    const cases = [
+        {key: "nearDistance", value: "401", other: "600", field: "开始变淡的距离", limit: "400"},
+        {key: "farDistance", value: "1201", other: "30", field: "立即关闭的距离", limit: "1200"}
+    ];
+
+    // 注意：findNumberInput 每次都会新建输入框并覆盖登记，
+    // 所以必须在循环外只取一次，否则上一轮填的值会被冲掉。
+    const nearInput = findNumberInput("nearDistance");
+    const farInput = findNumberInput("farDistance");
+
+    for (const item of cases) {
+        const captured = [];
+        const originalI18n = plugin.i18n;
+        const originalShowError = plugin.showError;
+        plugin.i18n = realI18n;
+        plugin.showError = (message) => captured.push(message);
+
+        nearInput.value = item.key === "nearDistance" ? item.value : item.other;
+        farInput.value = item.key === "farDistance" ? item.value : item.other;
+
+        const savedBefore = savedPayloads.length;
+        const settingsBefore = JSON.stringify(plugin.settings);
+        const ok = plugin.readAndValidateSettings();
+        plugin.i18n = originalI18n;
+        plugin.showError = originalShowError;
+
+        assert.equal(ok, false, `${item.key}=${item.value} 应判为不合法`);
+        assert.equal(savedPayloads.length, savedBefore, "不合法时不应落盘");
+        assert.equal(JSON.stringify(plugin.settings), settingsBefore,
+            "被拒绝时不应改动内存里的设置（更不该夹取成边界值）");
+        assert.equal(captured.length, 1, `应产生一条错误提示（${item.key}）`);
+        const text = captured[0];
+        assert.ok(!text.includes("${"), `提示里不应残留占位符，实际：${text}`);
+        assert.ok(text.includes(item.field), `提示应指明是哪个字段，实际：${text}`);
+        assert.ok(text.includes(item.value), `提示应带上用户填的值，实际：${text}`);
+        assert.ok(text.includes(item.limit), `提示应带上允许范围，实际：${text}`);
+    }
+});
+
+// 收拾：恢复默认设置，避免影响后续用例
+plugin.settings.nearDistance = nearDistance;
+plugin.settings.farDistance = farDistance;
+plugin.syncInputs();
+
 // ① 选字后工具条弹出
 toolbarPopupAt(200, 315);
 tick(4);
 
-check("工具条弹出后加上淡出类名，且鼠标就在选区上时保持不透明", () => {
+await check("工具条弹出后加上淡出类名，且鼠标就在选区上时保持不透明", () => {
     assert.ok(toolbar.classList.contains("sy-toolbar-fade"), "应加上 sy-toolbar-fade");
     assert.equal(toolbar.style.opacity, "1", `不透明度应仍为 1，实际 ${toolbar.style.opacity}`);
 });
 
-check("工具条保持可点击（不能禁用指针事件，否则按钮全部失效、点击穿透到正文）", () => {
+await check("工具条保持可点击（不能禁用指针事件，否则按钮全部失效、点击穿透到正文）", () => {
     assert.notEqual(toolbar.style.pointerEvents, "none", "内联 pointer-events 不应为 none");
     const injected = plugin.styleElement.textContent;
     assert.ok(injected.includes("opacity"), "应注入透明度过渡");
@@ -528,7 +698,7 @@ check("工具条保持可点击（不能禁用指针事件，否则按钮全部�
         "注入的样式里不应出现 pointer-events: none");
 });
 
-check("距离→不透明度映射符合要求（单调变淡、有可见下限）", () => {
+await check("距离→不透明度映射符合要求（单调变淡、有可见下限）", () => {
     const fader = [...plugin.faders.values()][0];
     assert.equal(fader.targetAlpha(0), 1, "距离 0 应完全清晰");
     assert.equal(fader.targetAlpha(nearDistance), 1, `距离 ${nearDistance}px 应完全清晰`);
@@ -586,7 +756,7 @@ const actualMid = moveMouseAtDistance((nearDistance + farDistance) / 2);
 settle();
 const midAlpha = Number(toolbar.style.opacity);
 
-check("距离取中时工具条已变淡，但仍然可见（未关闭）", () => {
+await check("距离取中时工具条已变淡，但仍然可见（未关闭）", () => {
     assert.ok(!toolbar.classList.contains("fn__none"), "不应被关闭");
     assert.ok(midAlpha > 0.5 && midAlpha < 1,
         `应处于「较淡」区间（0.5~1），实际 ${midAlpha}（距离 ${actualMid.toFixed(0)}px）`);
@@ -596,7 +766,7 @@ const actualEdge = moveMouseAtDistance(farDistance - 15);
 settle();
 const barelyAlpha = Number(toolbar.style.opacity);
 
-check("接近关闭距离时更淡，但依然可见（有「还看得见」的下限）", () => {
+await check("接近关闭距离时更淡，但依然可见（有「还看得见」的下限）", () => {
     assert.ok(!toolbar.classList.contains("fn__none"), "达到关闭距离之前不应被关闭");
     assert.ok(barelyAlpha < midAlpha, `应比中点更淡：${midAlpha} → ${barelyAlpha}`);
     assert.ok(barelyAlpha > 0.3, `应保留「还看得见」的下限，实际 ${barelyAlpha}`);
@@ -607,7 +777,7 @@ console.log(`  透明度：清晰 1 → 中点(${actualMid.toFixed(0)}px) ${midA
 moveMouse(200, 315);
 settle();
 
-check("鼠标移回工具条附近后恢复为完全不透明", () => {
+await check("鼠标移回工具条附近后恢复为完全不透明", () => {
     assert.equal(toolbar.style.opacity, "1", `实际 ${toolbar.style.opacity}`);
 });
 
@@ -615,7 +785,7 @@ check("鼠标移回工具条附近后恢复为完全不透明", () => {
 const overDistance = moveMouseAtDistance(farDistance + 15);
 tick(1);
 
-check("越过关闭距离后立即关闭（不延时、不等待动画）", () => {
+await check("越过关闭距离后立即关闭（不延时、不等待动画）", () => {
     assert.ok(overDistance > farDistance, `前置条件：应真的越过 ${farDistance}px，实际 ${overDistance.toFixed(0)}px`);
     assert.ok(toolbar.classList.contains("fn__none"), "应立即补上 fn__none");
     assert.equal(toolbar.style.display, "", "关闭时不应残留内联 display");
@@ -627,7 +797,7 @@ tick(20);
 moveMouse(200, 315);
 tick(20);
 
-check("关闭后鼠标移动不会再把它显示出来（不重复显示）", () => {
+await check("关闭后鼠标移动不会再把它显示出来（不重复显示）", () => {
     assert.ok(toolbar.classList.contains("fn__none"), "应保持关闭状态");
     assert.equal(toolbar.style.opacity, "1", "透明度应已复位");
 });
@@ -636,7 +806,7 @@ check("关闭后鼠标移动不会再把它显示出来（不重复显示）", (
 toolbarPopupAt(200, 315);
 tick(4);
 
-check("重新选字后工具条恢复不透明并重新武装", () => {
+await check("重新选字后工具条恢复不透明并重新武装", () => {
     assert.ok(!toolbar.classList.contains("fn__none"), "不应仍处于关闭状态");
     assert.equal(toolbar.style.opacity, "1");
     assert.equal(toolbar.style.pointerEvents, "");
@@ -650,7 +820,7 @@ plugin.settings.enabled = false;
 moveMouse(200, 315);
 tick(4);
 
-check("关闭「启用距离淡出」后不再改变透明度", () => {
+await check("关闭「启用距离淡出」后不再改变透明度", () => {
     assert.ok(fadedBeforeToggle < 1, `前置条件失败：关开关前应先变淡，实际 ${fadedBeforeToggle}`);
     assert.equal(toolbar.style.opacity, "1", `实际 ${toolbar.style.opacity}`);
     moveMouse(1200, 800);
@@ -664,27 +834,31 @@ plugin.settings.enabled = true;
 toolbar.classList.add("fn__none");
 tick(4);
 
-check("工具条被思源核心隐藏后，插件清理掉自己的类名与内联透明度", () => {
+await check("工具条被思源核心隐藏后，插件清理掉自己的类名与内联透明度", () => {
     assert.ok(!toolbar.classList.contains("sy-toolbar-fade"), "淡出类名应被移除");
     assert.equal(toolbar.style.opacity, "1");
 });
 
-// ⑧ 距离设反时自动纠正
-plugin.settings.nearDistance = 400;
-plugin.settings.farDistance = 10;
+// ⑧ 距离设反时不再自动纠正（改为保存时报错，见前面几条「场景」用例）
+plugin.settings.nearDistance = 190;
+plugin.settings.farDistance = 150;
 plugin.normalize();
 
-check("距离参数设反时自动纠正", () => {
-    assert.ok(plugin.settings.farDistance > plugin.settings.nearDistance,
-        `far=${plugin.settings.farDistance} 应大于 near=${plugin.settings.nearDistance}`);
+await check("normalize() 只做范围清洗与取整，不替用户纠正「距离填反」", () => {
+    assert.equal(plugin.settings.nearDistance, 190, "范围内应原样保留，不被改动");
+    assert.equal(plugin.settings.farDistance, 150);
+    assert.equal(plugin.validateSettings(), false, "这种组合应判为不合法");
 });
 
-// ⑧b 设置面板的保存回调
+// ⑧b 设置面板的保存回调（先用合法值把状态恢复干净）
+plugin.settings.nearDistance = nearDistance;
+plugin.settings.farDistance = farDistance;
+plugin.syncInputs();
 const savedBefore = savedPayloads.length;
 plugin.setting.options.confirmCallback();
-await new Promise((resolve) => setTimeout(resolve, 20));
+await flush();
 
-check("设置面板保存回调会落盘并提示", () => {
+await check("设置面板保存回调会落盘并提示", () => {
     assert.ok(savedPayloads.length > savedBefore, "应调用 saveData 落盘");
     const last = savedPayloads.at(-1);
     assert.ok(last && Number.isFinite(last.nearDistance) && Number.isFinite(last.farDistance),
@@ -700,14 +874,14 @@ plugin.setting = null;
 const savedSettingClass = settingClassOverride;
 settingClassOverride = undefined;
 
-check("siyuan 未导出 Setting 时给出可见错误，而不是静默无反应", () => {
+await check("siyuan 未导出 Setting 时给出可见错误，而不是静默无反应", () => {
     plugin.openSetting();
     const errors = siyuanStub.messages.slice(settingsBeforeFail).filter((item) => item.type === "error");
     assert.ok(errors.length > 0, "应弹出 error 类型提示");
     assert.ok(errors.at(-1).message.includes("Setting"), `提示应说明原因，实际：${errors.at(-1).message}`);
 });
 
-check("报错之后核心功能不受影响（设置面板坏了也不影响淡出）", () => {
+await check("报错之后核心功能不受影响（设置面板坏了也不影响淡出）", () => {
     plugin.setting = null;
     // 上一个用例把距离改成了 400/450（测试「设反自动纠正」），这里恢复默认再做几何判定
     plugin.settings.nearDistance = nearDistance;
@@ -728,7 +902,7 @@ settingClassOverride = savedSettingClass;
 // ⑨ 卸载：清理干净
 const injectedStyles = allStyleElements.slice();
 plugin.onunload();
-check("卸载后移除注入样式、断开接管", () => {
+await check("卸载后移除注入样式、断开接管", () => {
     assert.equal(plugin.faders.size, 0);
     assert.ok(injectedStyles.length > 0, "前置条件失败：应当注入过样式");
     assert.ok(injectedStyles.every((element) => element.removed === true && !element.isConnected),
@@ -743,3 +917,6 @@ check("卸载后移除注入样式、断开接管", () => {
 
 console.log(`\n${results.join("\n")}`);
 console.log(process.exitCode ? "\n存在失败用例。" : "\n全部通过。");
+
+
+

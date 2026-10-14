@@ -22,16 +22,17 @@ export class Plugin {
 }
 
 /**
- * 模拟思源真实的 Setting：
- *   - open() 每次都「新建」一个对话框，并记录到 this.dialog（这正是重复弹面板的根源）
- *   - open() 会把对话框内容节点挂到 this.element 上，插件的 syncInputs() 要从这里查输入框
- *   - dialog 上有 destroy()，销毁时把次数记到插件实例上，便于断言
+ * 模拟思源真实的 Setting（结构按 3.8.7 的 common/main bundle 对齐）：
+ *   - open() 每次都「新建」一个对话框，并记录到 this.dialog（这正是重复弹面板的根源）；
+ *   - **没有 element 成员**：思源把内容节点存在 open() 的局部变量里，
+ *     类上只留下 dialog。所以插件不能靠 setting.element 去查输入框
+ *     （早期版本就是这么写的，导致「恢复默认」刷新输入框静默失效）；
+ *   - dialog 上有 destroy()，销毁时把次数记到插件实例上，便于断言。
  */
 export class Setting {
     constructor(options = {}) {
         this.options = options;
         this.items = [];
-        this.element = null;
         this.opened = false;
         this.dialog = null;
         this.openCount = 0;
@@ -45,13 +46,7 @@ export class Setting {
         this.opened = true;
         this.openedTitle = title;
         this.openCount += 1;
-        // 真身这里 new Dialog 并把 .b3-dialog__content 存进 this.element；
-        // 桩件用同样的 DOM 建一个容器，好让按数据键刷新输入框的逻辑可测。
-        const content = document.createElement("div");
-        content.className = "b3-dialog__content";
-        this.element = content;
-
-        const plugin = this.plugin;
+        const setting = this;
         const handle = {
             title,
             live: true,
@@ -60,8 +55,12 @@ export class Setting {
                     return;
                 }
                 this.live = false;
-                if (plugin) {
-                    plugin.settingDestroyed = (plugin.settingDestroyed || 0) + 1;
+                if (setting.plugin) {
+                    setting.plugin.settingDestroyed = (setting.plugin.settingDestroyed || 0) + 1;
+                }
+                // 真身：思源关闭对话框时会调用 Setting 的 destroyCallback
+                if (typeof setting.options.destroyCallback === "function") {
+                    setting.options.destroyCallback();
                 }
             }
         };

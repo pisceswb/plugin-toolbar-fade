@@ -70,7 +70,7 @@ const LIMITS = {
 /** 加在工具条上的类名（样式见同目录 index.css） */
 const FADE_CLASS = "sy-toolbar-fade";
 /** 版本号，仅用于日志排查 */
-const VERSION = "0.2.5";
+const VERSION = "0.2.9";
 /** 工具条矩形向外扩张的距离（像素）：工具条是主要操作对象，扩得多一点 */
 const PAD_TOOLBAR = 10;
 /** 选区矩形向外扩张的距离（像素） */
@@ -467,6 +467,8 @@ export default class ToolbarFadePlugin extends api("Plugin") {
         this.onFaderErrorBindThis = this.onFaderError.bind(this);
         /** 已经提示过的错误信息，避免每帧弹一次提示 */
         this.reportedErrors = new Set();
+        /** 设置面板里的数字输入框：key -> input（思源不保存内容节点，只能自己记） */
+        this.numberInputs = new Map();
         this.styleElement = null;
         this.setting = null;
     }
@@ -675,7 +677,11 @@ export default class ToolbarFadePlugin extends api("Plugin") {
         return this.settings;
     }
 
-    /** 读取设置并清洗非法值（例如用户手改 JSON，或距离设反了） */
+    /**
+     * 清洗单个数值：非数字回退默认值、四舍五入并夹到允许范围。
+     * 注意：这里**不做**「距离填反就自动帮用户改」这类跨字段纠正——
+     * 那属于替用户改数字，容易让人困惑；改由 validateSettings() 报错让用户自己改。
+     */
     normalize() {
         const settings = this.settings;
         settings.enabled = settings.enabled !== false;
@@ -685,9 +691,6 @@ export default class ToolbarFadePlugin extends api("Plugin") {
                 value = DEFAULTS[key];
             }
             settings[key] = Math.round(clamp(value, LIMITS[key][0], LIMITS[key][1]));
-        }
-        if (settings.farDistance <= settings.nearDistance) {
-            settings.farDistance = Math.min(LIMITS.farDistance[1], settings.nearDistance + 40);
         }
         return settings;
     }
@@ -701,11 +704,127 @@ export default class ToolbarFadePlugin extends api("Plugin") {
     }
 
     async saveSettings() {
-        this.normalize();
+        // 到这里为止 settings 已经过校验与清洗（readAndValidateSettings 负责）
+        this.syncInputs();
         await this.saveData(STORAGE_NAME, this.settings);
         // 让已经打开的工具条立刻用上新参数
         for (const fader of this.faders.values()) {
             fader.sync();
+        }
+    }
+
+    /** 按语言取文案并填充 ${...} 占位符 */
+    fillTemplate(key, values) {
+        let text = String(this.i18n[key] || key);
+        // 用 split/join：String.replace 的替换串会解释 $ 特殊序列，
+        // 而 "${name}" 这种写法在 JS 里又容易被当成模板插值，容易出错。
+        Object.keys(values || {}).forEach((name) => {
+            text = text.split("${" + name + "}").join(String(values[name]));
+        });
+        return text;
+    }
+
+    /**
+     * 读取面板里的输入框值，校验合法性；通过后把 settings 更新为清洗过的值。
+     *
+     * 校验规则（任何一条不通过都会给出提示并拒绝保存，绝不悄悄改用户的数字）：
+     *   1. 必须是数字；
+     *   2. 必须落在允许范围内（超出范围时明确告诉用户允许范围）；
+     *   3. 「开始变淡的距离」必须小于「立即关闭的距离」。
+     */
+    readAndValidateSettings() {
+        const raw = {};
+        this.numberInputs.forEach((input, key) => {
+            raw[key] = Number(input.value);
+        });
+        if (raw.nearDistance === undefined && raw.farDistance === undefined) {
+            // 面板从来没被打开过（没有输入框可读）：沿用当前设置
+            return this.validateSettings();
+        }
+
+        const keys = ["nearDistance", "farDistance"];
+        for (const key of keys) {
+            if (raw[key] === undefined) {
+                continue;
+            }
+            if (!Number.isFinite(raw[key])) {
+                this.showError(this.fillTemplate("invalidDistanceNumber", {
+                    field: this.i18n[key],
+                    value: String(this.numberInputs.get(key) ? this.numberInputs.get(key).value : "")
+                }));
+                return false;
+            }
+            const min = LIMITS[key][0];
+            const max = LIMITS[key][1];
+            if (raw[key] < min || raw[key] > max) {
+                this.showError(this.fillTemplate("invalidDistanceRange", {
+                    field: this.i18n[key],
+                    value: String(raw[key]),
+                    min: String(min),
+                    max: String(max)
+                }));
+                return false;
+            }
+        }
+
+        // 校验通过：写入并按范围取整（四舍五入不会越界，因为上面已经确认在范围内）
+        keys.forEach((key) => {
+            if (raw[key] !== undefined) {
+                this.settings[key] = raw[key];
+            }
+        });
+        this.normalize();
+        return this.validateSettings();
+    }
+
+    /**
+     * 校验设置面板里的距离。
+     * 不满足「开始变淡的距离 < 立即关闭的距离」时给出错误提示并拒绝保存，
+     * 让用户自己改数字——而不是悄悄替他改掉（那样很容易让人困惑）。
+     */
+    validateSettings() {
+        const near = this.settings.nearDistance;
+        const far = this.settings.farDistance;
+        if (!Number.isFinite(near) || !Number.isFinite(far)) {
+            this.showError(this.i18n.invalidDistance);
+            return false;
+        }
+        if (near >= far) {
+            this.showError(this.fillTemplate("invalidDistanceOrder", {near, far}));
+            return false;
+        }
+        return true;
+    }
+
+    /** 弹出错误提示；若由于样式问题弹不出来，至少把原因写进控制台 */
+    showError(message) {
+        const text = message || "设置不合法";
+        try {
+            const show = api("showMessage");
+            if (typeof show === "function") {
+                show(text, 6000, "error");
+                return;
+            }
+        } catch (error) {
+            void error;
+        }
+        console.error(`[toolbar-fade] ${text}`);
+    }
+
+    /**
+     * 让设置面板保持打开。
+     * 思源的「保存」按钮点完会自动关闭对话框（它的处理器是 confirmCallback(); destroy()），
+     * 所以在校验失败时先置标记，等关闭回调里再重新打开一个。
+     */
+    async reopenSetting() {
+        if (!this.setting) {
+            return;
+        }
+        try {
+            this.setting.open(this.displayName || this.name);
+            this.settingsOpened = (this.settingsOpened || 0) + 1;
+        } catch (error) {
+            this.reportError("重新打开设置面板失败", error);
         }
     }
 
@@ -732,6 +851,11 @@ export default class ToolbarFadePlugin extends api("Plugin") {
         }
         this.setting = new SettingClass({
             confirmCallback: () => {
+                // 校验失败时：提示错误、不保存，并让面板保持打开（见 reopenSetting 注释）
+                if (!this.readAndValidateSettings()) {
+                    this.reopenAfterClose = true;
+                    return;
+                }
                 this.saveSettings().then(() => {
                     const show = api("showMessage");
                     if (typeof show === "function") {
@@ -740,6 +864,13 @@ export default class ToolbarFadePlugin extends api("Plugin") {
                 }).catch((error) => {
                     this.reportError("保存设置失败", error);
                 });
+            },
+            destroyCallback: () => {
+                // 思源的保存按钮会强制关闭对话框，这里把校验失败时的面板补回来
+                if (this.reopenAfterClose) {
+                    this.reopenAfterClose = false;
+                    this.reopenSetting();
+                }
             }
         });
         this.fillSetting();
@@ -759,8 +890,7 @@ export default class ToolbarFadePlugin extends api("Plugin") {
         try {
             this.ensureSetting();
         } catch (error) {
-            this.reportError("打开设置面板失败", error);
-            return;
+            this.reportError("打开设置面板失败", error);            return;
         }
         super.openSetting();
     }
@@ -816,7 +946,7 @@ export default class ToolbarFadePlugin extends api("Plugin") {
     addNumberItem(key, min, max, step) {
         this.setting.addItem({
             title: this.i18n[key],
-            description: this.i18n[`${key}Tip`],
+            description: this.i18n[key + "Tip"],
             createActionElement: () => {
                 const input = document.createElement("input");
                 input.type = "number";
@@ -826,29 +956,32 @@ export default class ToolbarFadePlugin extends api("Plugin") {
                 input.step = String(step);
                 input.dataset.key = key;
                 input.value = String(this.settings[key]);
-                input.addEventListener("change", () => {
-                    const value = Number(input.value);
-                    this.settings[key] = Number.isFinite(value) ? value : DEFAULTS[key];
-                    // 清洗后可能连带修正另一个距离值，所以每个输入框都重新同步一次
-                    this.normalize();
-                    this.syncInputs();
-                });
+                // 自己登记输入框：思源的 Setting 不保存内容节点（类里没有 element 成员，
+                // 内容被存在 open() 的局部变量里），所以不能靠查 DOM 来刷新它们。
+                this.numberInputs.set(key, input);
+                // 刻意不监听 change：
+                //   · 边输入边归一化会在用户输入过程中改写数字（点「恢复默认」时更是会先
+                //     写回旧值、再被重置覆盖，出现「先变成其它数字再跳回默认值」的闪烁）；
+                //   · 约束（near < far）只要在保存时成立即可，saveSettings() 会做归一化。
                 return input;
             }
         });
     }
 
     /**
-     * 把设置面板里的输入框刷新成当前设置值。
-     * 用于两处：① 用户手改数值后归一化可能顺带修正了另一个距离；
-     * ② 点「恢复默认」时就地更新两个文本框——不必重建对话框。
+     * 把面板里的数字输入框刷新成当前设置值。用于两处：
+     *   ① 用户手改数值后归一化（例如把距离设反）可能顺带修正了另一个距离；
+     *   ② 点「恢复默认」时就地更新文本框——不必重建对话框。
+     *
+     * 注意：这里用自己登记的输入框，不去查 setting.element —— 思源没有这个属性，
+     * 查它会静默失效（表现为点了「恢复默认」界面上的数值不变，保存后重开才更新）。
      */
     syncInputs() {
-        if (!this.setting || !this.setting.element) {
-            return;
-        }
-        this.setting.element.querySelectorAll("input[data-key]").forEach((input) => {
-            input.value = String(this.settings[input.dataset.key]);
+        this.numberInputs.forEach((input, key) => {
+            const value = this.settings[key];
+            if (value !== undefined && value !== null) {
+                input.value = String(value);
+            }
         });
     }
 
@@ -893,3 +1026,4 @@ const STYLE_TEXT = `
     transition-timing-function: ease-out;
 }
 `;
+

@@ -7,6 +7,10 @@
   "farDistance": "立即关闭的距离（像素）",
   "farDistanceTip": "鼠标超过这个距离时立即关闭工具条（不延时、不重复显示）。在这个距离上工具条还看得见，只是颜色较淡",
   "saved": "已保存",
+  "invalidDistance": "距离设置无效：必须是数字",
+  "invalidDistanceNumber": "「${field}」必须是数字，当前为「${value}」，请修改后再保存",
+  "invalidDistanceRange": "「${field}」超出允许范围：你填的是 ${value}，允许范围是 ${min} ~ ${max}，请修改后再保存",
+  "invalidDistanceOrder": "「开始变淡的距离」必须小于「立即关闭的距离」（当前为 ${near} 与 ${far}），请修改后再保存",
   "resetDefaults": "恢复默认",
   "restartHint": "20 以内完全清晰 → 越远越淡 → 超过 200 直接关闭。改动实时生效，不需要重启思源"
 }

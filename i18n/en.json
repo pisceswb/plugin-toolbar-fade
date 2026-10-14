@@ -7,6 +7,10 @@
   "farDistance": "Close immediately beyond (px)",
   "farDistanceTip": "The toolbar is closed immediately past this distance (no delay, no re-showing). At exactly this distance it is still visible, only faint",
   "saved": "Saved",
+  "invalidDistance": "Invalid distance: it must be a number",
+  "invalidDistanceNumber": "\"${field}\" must be a number, but it is \"${value}\". Please fix it and save again.",
+  "invalidDistanceRange": "\"${field}\" is out of range: you entered ${value}, but the allowed range is ${min} ~ ${max}. Please fix it and save again.",
+  "invalidDistanceOrder": "\"Fade starts beyond\" must be smaller than \"Close immediately beyond\" (currently ${near} and ${far}). Please fix it and save again.",
   "resetDefaults": "Reset to defaults",
   "restartHint": "Fully opaque within 20 → fainter with distance → closed immediately past 200. Changes apply instantly, no restart needed"
 }

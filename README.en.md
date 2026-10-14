@@ -74,6 +74,10 @@ Only those two distances are configurable. "Delay before fading" and "fade durat
 not settings: fading is a continuous function of distance, and closing happens the moment the
 distance is exceeded, so neither needs a timing knob.
 
+Constraint: **"Fade starts beyond" must be smaller than "Close immediately beyond".** If they are
+reversed, saving shows an error, **saves nothing and keeps the panel open**, so you can correct the
+numbers yourself (the plugin never rewrites your values).
+
 The measured distance is **the shorter of** the distance to the toolbar and the distance to the
 current selection. So the mouse resting on the selected text, or on the toolbar itself, counts as
 distance 0 and the toolbar stays fully opaque.
