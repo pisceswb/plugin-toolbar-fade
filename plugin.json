@@ -2,7 +2,7 @@
   "name": "plugin-toolbar-fade",
   "author": "pisceswb",
   "url": "https://github.com/pisceswb/plugin-toolbar-fade",
-  "version": "0.2.3",
+  "version": "0.2.5",
   "minAppVersion": "3.0.0",
   "backends": [
     "all"

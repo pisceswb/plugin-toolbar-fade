@@ -403,6 +403,9 @@ plugin.removeData = async () => {
 };
 plugin.eventBus = {on() {}, off() {}};
 
+// 让桩件的 Setting 能拿到插件实例（真身由思源在构造 Setting 时建立这层关系）
+siyuanStub.Setting.prototype.plugin = plugin;
+
 const results = [];
 function check(title, fn) {
     try {
@@ -474,6 +477,39 @@ check("openSetting() 能正常打开面板", () => {
     assert.equal(plugin.setting.opened, true, "设置对话框应被打开");
     assert.equal(plugin.settingOpened, true, "应走到基类的 openSetting");
 });
+
+function findNumberInput(key) {
+    const item = plugin.setting.items.find((entry) => entry.title === key);
+    assert.ok(item && typeof item.createActionElement === "function", `应存在设置项 ${key}`);
+    return item.createActionElement();
+}
+
+check("点「恢复默认」是就地刷新两个文本框，不会弹出新面板", () => {
+    // 先改掉设置，并让面板里的文本框处于「已被改动」的状态
+    plugin.settings.nearDistance = 111;
+    plugin.settings.farDistance = 999;
+    const nearInput = findNumberInput("nearDistance");
+    const farInput = findNumberInput("farDistance");
+    nearInput.value = "111";
+    farInput.value = "999";
+    const openCountBefore = plugin.setting.openCount;
+
+    const resetItem = plugin.setting.items.find((item) => item.title === "resetDefaults");
+    assert.ok(resetItem && typeof resetItem.createActionElement === "function", "应存在「恢复默认」按钮");
+    resetItem.createActionElement()._listeners.click();
+
+    assert.equal(plugin.settings.nearDistance, 20, "重置后应是新默认值 20");
+    assert.equal(plugin.settings.farDistance, 200, "重置后应是默认值 200");
+    assert.equal(nearInput.value, "20", `文本框应就地更新为 20，实际 ${nearInput.value}`);
+    assert.equal(farInput.value, "200", `文本框应就地更新为 200，实际 ${farInput.value}`);
+    assert.equal(plugin.setting.openCount, openCountBefore,
+        "不应重新调用 open()（那会新建一个面板，旧面板就变成孤儿）");
+    assert.equal(plugin.settingDestroyed || 0, 0, "也不需要销毁任何对话框");
+});
+
+// 把设置恢复到默认，避免影响后续用例
+plugin.settings.nearDistance = nearDistance;
+plugin.settings.farDistance = farDistance;
 
 // ① 选字后工具条弹出
 toolbarPopupAt(200, 315);

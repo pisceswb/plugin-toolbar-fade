@@ -21,12 +21,20 @@ export class Plugin {
     }
 }
 
+/**
+ * 模拟思源真实的 Setting：
+ *   - open() 每次都「新建」一个对话框，并记录到 this.dialog（这正是重复弹面板的根源）
+ *   - open() 会把对话框内容节点挂到 this.element 上，插件的 syncInputs() 要从这里查输入框
+ *   - dialog 上有 destroy()，销毁时把次数记到插件实例上，便于断言
+ */
 export class Setting {
     constructor(options = {}) {
         this.options = options;
         this.items = [];
         this.element = null;
         this.opened = false;
+        this.dialog = null;
+        this.openCount = 0;
     }
 
     addItem(item) {
@@ -36,6 +44,29 @@ export class Setting {
     open(title) {
         this.opened = true;
         this.openedTitle = title;
+        this.openCount += 1;
+        // 真身这里 new Dialog 并把 .b3-dialog__content 存进 this.element；
+        // 桩件用同样的 DOM 建一个容器，好让按数据键刷新输入框的逻辑可测。
+        const content = document.createElement("div");
+        content.className = "b3-dialog__content";
+        this.element = content;
+
+        const plugin = this.plugin;
+        const handle = {
+            title,
+            live: true,
+            destroy() {
+                if (!this.live) {
+                    return;
+                }
+                this.live = false;
+                if (plugin) {
+                    plugin.settingDestroyed = (plugin.settingDestroyed || 0) + 1;
+                }
+            }
+        };
+        this.dialog = handle;
+        return handle;
     }
 }
 

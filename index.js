@@ -78,7 +78,7 @@ const LIMITS = {
 /** 加在工具条上的类名（样式见同目录 index.css） */
 const FADE_CLASS = "sy-toolbar-fade";
 /** 版本号，仅用于日志排查 */
-const VERSION = "0.2.3";
+const VERSION = "0.2.5";
 /** 工具条矩形向外扩张的距离（像素）：工具条是主要操作对象，扩得多一点 */
 const PAD_TOOLBAR = 10;
 /** 选区矩形向外扩张的距离（像素） */
@@ -703,6 +703,8 @@ class ToolbarFadePlugin extends api("Plugin") {
         const stored = await this.loadData(STORAGE_NAME) || {};
         this.settings = Object.assign({}, DEFAULTS, stored);
         this.normalize();
+        // 面板可能存在（比如重载后再打开），把归一化后的值同步回输入框
+        this.syncInputs();
     }
 
     async saveSettings() {
@@ -802,13 +804,15 @@ class ToolbarFadePlugin extends api("Plugin") {
                 button.className = "b3-button b3-button--outline";
                 button.textContent = this.i18n.resetDefaults;
                 button.addEventListener("click", () => {
+                    // 直接就地刷新面板里的输入框即可，不必重建对话框：
+                    // 重新 open() 会 new 出一个新面板（旧的不销毁就变成孤儿面板，
+                    // 销毁了又会闪烁、丢失滚动位置与焦点）。
                     this.settings = Object.assign({}, DEFAULTS);
-                    this.reopenSetting();
+                    this.syncInputs();
                 });
                 return button;
             }
         });
-
         this.setting.addItem({
             title: "",
             description: "",
@@ -841,7 +845,11 @@ class ToolbarFadePlugin extends api("Plugin") {
         });
     }
 
-    /** 把设置面板里的数字框刷新成当前设置值（归一化可能改动了它们） */
+    /**
+     * 把设置面板里的输入框刷新成当前设置值。
+     * 用于两处：① 用户手改数值后归一化可能顺带修正了另一个距离；
+     * ② 点「恢复默认」时就地更新两个文本框——不必重建对话框。
+     */
     syncInputs() {
         if (!this.setting || !this.setting.element) {
             return;
@@ -849,18 +857,6 @@ class ToolbarFadePlugin extends api("Plugin") {
         this.setting.element.querySelectorAll("input[data-key]").forEach((input) => {
             input.value = String(this.settings[input.dataset.key]);
         });
-    }
-
-    /** 重新打开设置面板，让所有控件按当前设置重建 */
-    reopenSetting() {
-        if (!this.setting) {
-            return;
-        }
-        try {
-            this.setting.open(this.name);
-        } catch (error) {
-            console.error("[toolbar-fade] reopen setting failed:", error);
-        }
     }
 
     /*─ 样式注入（不依赖 addStyle，卸载时可靠移除）─*/
