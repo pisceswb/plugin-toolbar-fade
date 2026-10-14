@@ -130,32 +130,25 @@ Pitfalls handled (all commented in `src/index.js`):
 
 ## Development
 
-The repository only ships what is needed to run and publish the plugin:
-
 ```
-index.js              ← build output (what SiYuan actually loads; don't edit)
-src/index.js          ← real source (native ESM, easier to maintain)
-i18n/                 ← zh-CN.json / en.json
-plugin.json           ← manifest
-icon.png preview.png  ← bazaar icon and preview
-README.md README.en.md PUBLISH.md LICENSE
+index.js         ← build output (what SiYuan actually loads; don't edit)
+src/index.js     ← real source (native ESM, easier to maintain)
+i18n/            ← zh-CN.json / en.json
+tools/           ← build, pack, preflight, offline tests, icon/preview generators
 ```
 
-Build, test, preflight, and image-generation tooling is **not** kept in the repository (locally it
-lives in the sibling `plugin-toolbar-fade-dev/`). After editing `src/index.js` you must re-bundle the
-entry and rebuild `package.zip` with those scripts:
+After editing `src/index.js` or `index.css` you must re-bundle the entry and rebuild
+`package.zip`:
 
 ```bash
-cd plugin-toolbar-fade-dev/tools
-node build.mjs            # src/index.js → index.js
-node test-fade.test.mjs   # offline tests (20 assertions)
-node pack.mjs             # build package.zip for a Release
-node preflight.mjs --author pisceswb   # check against the bazaar rules
-# or npm run release; see DEVELOPMENT.md in that folder
+npm run build       # src/index.js → index.js
+npm test            # offline tests (20 assertions)
+npm run pack        # build package.zip for a Release
+npm run preflight   # check against the bazaar rules
+npm run release     # all of the above in one go
 ```
 
-The scripts locate the plugin directory automatically; you can also pass it explicitly:
-`node build.mjs ../../plugin-toolbar-fade`.
+See [DEVELOPMENT.md](./DEVELOPMENT.md) (Chinese) for details.
 
 ### Why the entry must be bundled
 

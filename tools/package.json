@@ -1,0 +1,5 @@
+{
+  "//": "tools 目录里的脚本都是 .mjs，这里标记一下模块类型即可；真正的 npm 脚本在仓库根的 package.json。",
+  "private": true,
+  "type": "module"
+}

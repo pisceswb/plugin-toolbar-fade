@@ -19,8 +19,7 @@
 
 ## 1. 仓库现状与需要改的地方
 
-> 仓库里只放**运行与发布必需**的文件；打包、测试、集市自检等开发工具保存在
-> 同级的 `plugin-toolbar-fade-dev/`（含 `DEVELOPMENT.md`），不必上传。
+> `src/` 与 `tools/` 是源码和开发工具，会一起提交到仓库，但**不会**打进 `package.zip`。
 
 本插件已经按集市规范整理过：
 
@@ -51,18 +50,24 @@
 
 ## 2. 打包并本地自检
 
-打包、测试与自检脚本**不在仓库里**（为了仓库保持简洁），本机保存在同级的 `plugin-toolbar-fade-dev/tools/`：
+在仓库根目录执行：
 
 ```bash
-cd plugin-toolbar-fade-dev/tools
-node build.mjs         # src/index.js → index.js（转成思源要的 CommonJS 包装）
-node test-fade.test.mjs  # 离线逻辑测试
-node pack.mjs          # 生成 package.zip
-node preflight.mjs --author pisceswb   # 按集市 rules/*.go 自检
+npm run build       # src/index.js → index.js（转成思源要的 CommonJS 包装）
+npm test            # 离线逻辑测试（20 项）
+npm run pack        # 生成 package.zip
+npm run preflight   # 按集市 rules/*.go 自检
+npm run release     # 上面四个一次跑完
 ```
 
-脚本会自动定位插件仓库目录，也可以显式传路径：`node pack.mjs ../../plugin-toolbar-fade`。
-也可以一条命令跑完：`npm run release`。细节见 `plugin-toolbar-fade-dev/DEVELOPMENT.md`。
+等价的手工写法（工具都在 `tools/`，会自动定位仓库目录）：
+
+```bash
+node tools/pack.mjs
+node tools/preflight.mjs --author pisceswb
+```
+
+细节见 [DEVELOPMENT.md](./DEVELOPMENT.md)。
 
 `preflight.mjs` 会在提 PR 之前就把下面这些坑拦下来：
 
@@ -191,7 +196,7 @@ git push -u origin main
 - [ ] 已发布 Release，且 **Latest Release** 附件里有 `package.zip`
 - [ ] Release Tag = `plugin.json` 的 `version`，**不带 `v` 前缀**
 - [ ] 改动过代码后**提高了 version** 并发新 Release
-- [ ] `preflight.mjs` 通过（`plugin-toolbar-fade-dev/tools/` 里运行）
+- [ ] `npm run preflight` 通过
 - [ ] `plugins.txt` 只加了一行 `owner/repo`
 - [ ] 仓库里没有 `node_modules`、`package.zip`、临时文件
 

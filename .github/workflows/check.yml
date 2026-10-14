@@ -1,0 +1,38 @@
+name: check
+
+# 每次推送 / PR 时自动跑一遍：离线测试 + 打包 + 集市规范自检。
+# 这样即使忘了本地跑 preflight，也能在提 PR 到 bazaar 之前发现清单或打包问题。
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: 打包插件入口
+        run: node tools/build.mjs
+
+      - name: 离线逻辑测试
+        run: node tools/test-fade.test.mjs
+
+      - name: 生成 package.zip
+        run: node tools/pack.mjs
+
+      - name: 集市规范自检
+        run: node tools/preflight.mjs
+
+      - name: 上传 package.zip 供人工检查
+        uses: actions/upload-artifact@v4
+        with:
+          name: package
+          path: package.zip

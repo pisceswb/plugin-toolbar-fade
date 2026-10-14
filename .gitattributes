@@ -1,4 +1,6 @@
-# 统一换行符，避免 clone / checkout 时出现 CRLF 警告与跨平台差异
+# 全仓库统一换行符为 LF，避免 clone / checkout 时出现 CRLF 警告与跨平台差异。
+# 注：不再为 *.bat / *.ps1 指定 eol=crlf —— cmd.exe 解析 LF 换行的 .bat 完全正常，
+# 那条规则只会让每个 clone 的人看到一次「LF will be replaced by CRLF」的提示。
 * text=auto eol=lf
 
 # 图片与压缩包是二进制，不要做换行符转换
@@ -8,7 +10,3 @@
 *.webp binary
 *.avif binary
 *.zip binary
-
-# 这些文件保留各自的换行习惯
-*.ps1 text eol=crlf
-*.bat text eol=crlf

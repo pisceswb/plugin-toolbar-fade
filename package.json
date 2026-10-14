@@ -1,15 +1,21 @@
 {
   "name": "plugin-toolbar-fade",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "思源笔记插件：选中文字后的浮动工具条随鼠标远离逐渐变淡，超过设定距离立即关闭",
   "license": "MIT",
+  "type": "module",
   "keywords": [
     "siyuan",
     "plugin",
-    "toolbar"
+    "toolbar",
+    "fade"
   ],
   "scripts": {
-    "note": "echo 打包/测试/自检脚本不在此仓库，见同级 plugin-toolbar-fade-dev/DEVELOPMENT.md"
+    "build": "node tools/build.mjs",
+    "test": "node tools/test-fade.test.mjs",
+    "pack": "node tools/pack.mjs",
+    "preflight": "node tools/preflight.mjs --author pisceswb",
+    "release": "node tools/build.mjs && node tools/test-fade.test.mjs && node tools/pack.mjs && node tools/preflight.mjs --author pisceswb"
   }
 }
